@@ -177,28 +177,23 @@ def collect_self_play_data(
 
 
 def loss_fn(net, data: TrainingExample):
-    """Sum of value loss, policy loss, and reference policy KL loss."""
+    """Sum of value loss and policy loss."""
     net, (action_logits, value) = batched_policy(net, data.state)
-    
-    # Original losses
+
+    # value loss (mse)
     mse_loss = optax.l2_loss(value, data.value)
     mse_loss = jnp.mean(mse_loss)
 
+    # policy loss (KL(target_policy', agent_policy))
     target_pr = data.action_weights
+    # to avoid log(0) = nan
     target_pr = jnp.where(target_pr == 0, EPSILON, target_pr)
     action_logits = jax.nn.log_softmax(action_logits, axis=-1)
     kl_loss = jnp.sum(target_pr * (jnp.log(target_pr) - action_logits), axis=-1)
     kl_loss = jnp.mean(kl_loss)
 
-    # Add KL divergence with reference policy
-    _, (ref_logits, _) = batched_policy(reference_agent, data.state)
-    ref_logits = jax.nn.log_softmax(ref_logits, axis=-1)
-    ref_pr = jnp.exp(ref_logits)
-    ref_kl_loss = jnp.sum(ref_pr * (ref_logits - action_logits), axis=-1)
-    ref_kl_loss = jnp.mean(ref_kl_loss) * reference_kl_weight
-
-    total_loss = mse_loss + kl_loss + ref_kl_loss
-    return total_loss, (net, (mse_loss, kl_loss, ref_kl_loss))
+    # return the total loss
+    return mse_loss + kl_loss, (net, (mse_loss, kl_loss))
 
 
 @partial(jax.pmap, axis_name="i")

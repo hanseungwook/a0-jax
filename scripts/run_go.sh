@@ -8,7 +8,7 @@
 #SBATCH --nodes=1                # Number of nodes
 #SBATCH --ntasks-per-node=1      # Number of tasks per node
 #SBATCH --cpus-per-task=16        # Number of CPU cores per task
-#SBATCH --mem=512G                # Memory per node
+#SBATCH --mem=128G                # Memory per node
 #SBATCH --gres=gpu:7             # Number of GPUs required
 
 # Set environment variable

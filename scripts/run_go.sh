@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=go_training    # Name of the job
-#SBATCH --output=go_%j.out        # Output file (%j will be replaced by job ID)
-#SBATCH --error=go_%j.err         # Error file
+#SBATCH --output=logs/go_%j.out        # Output file (%j will be replaced by job ID)
+#SBATCH --error=logs/go_%j.err         # Error file
 #SBATCH --time=240:00:00          # Maximum runtime in HH:MM:SS
 #SBATCH --partition=ada6000-shared
 #SBATCH --qos=vision-shared

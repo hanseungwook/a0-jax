@@ -20,7 +20,7 @@ import numpy as np
 import opax
 import optax
 import pax
-
+from tqdm import trange, tqdm
 from games.env import Enviroment
 from play import PlayResults, agent_vs_agent_multiple_games
 from tree_search import improve_policy_with_mcts, recurrent_fn
@@ -159,20 +159,19 @@ def collect_self_play_data(
     rng_keys = jnp.stack(rng_key_list).reshape((num_iters, num_devices, -1))  # type: ignore
     data = []
 
-    with click.progressbar(range(num_iters), label="  self play     ") as bar:
-        for i in bar:
-            batch = collect_batched_self_play_data(
-                agent,
-                env,
-                rng_keys[i],
-                batch_size // num_devices,
-                num_simulations_per_move,
-            )
-            batch = jax.device_get(batch)
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((-1, *x.shape[2:])), batch
-            )
-            data.extend(prepare_training_data(batch, env=env))
+    for i in tqdm(range(num_iters), desc="Self play"):
+        batch = collect_batched_self_play_data(
+            agent,
+            env,
+            rng_keys[i],
+            batch_size // num_devices,
+            num_simulations_per_move,
+        )
+        batch = jax.device_get(batch)
+        batch = jax.tree_util.tree_map(
+            lambda x: x.reshape((-1, *x.shape[2:])), batch
+        )
+        data.extend(prepare_training_data(batch, env=env))
     return data
 
 
@@ -254,7 +253,7 @@ def train(
         x = np.reshape(x, (num_devices, -1) + x.shape[1:])
         return x
 
-    for iteration in range(start_iter, num_iterations):
+    for iteration in trange(start_iter, num_iterations):
         print(f"Iteration {iteration}")
         rng_key_1, rng_key_2, rng_key_3, rng_key = jax.random.split(rng_key, 4)
         agent = agent.eval()
@@ -272,12 +271,11 @@ def train(
         agent, losses = agent.train(), []
         agent, optim = jax.device_put_replicated((agent, optim), devices)
         ids = range(0, len(data) - training_batch_size, training_batch_size)
-        with click.progressbar(ids, label="  train agent   ") as progressbar:
-            for idx in progressbar:
-                batch = data[idx : (idx + training_batch_size)]
-                batch = jax.tree_util.tree_map(_stack_and_reshape, *batch)
-                agent, optim, loss = train_step(agent, optim, batch)
-                losses.append(loss)
+        for idx in tqdm(ids, desc="Train agent"):
+            batch = data[idx : (idx + training_batch_size)]
+            batch = jax.tree_util.tree_map(_stack_and_reshape, *batch)
+            agent, optim, loss = train_step(agent, optim, batch)
+            losses.append(loss)
 
         value_loss, policy_loss = zip(*losses)
         value_loss = np.mean(sum(jax.device_get(value_loss))) / len(value_loss)

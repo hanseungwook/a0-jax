@@ -25,6 +25,7 @@ from games.env import Enviroment
 from play import PlayResults, agent_vs_agent_multiple_games
 from tree_search import improve_policy_with_mcts, recurrent_fn
 from utils import batched_policy, env_step, import_class, replicate, reset_env
+import wandb
 
 EPSILON = 1e-9  # a very small positive value
 
@@ -217,8 +218,25 @@ def train(
     random_seed: int = 42,
     weight_decay: float = 1e-4,
     lr_decay_steps: int = 100_000,
+    wandb_project: str = "a0-jax",
 ):
     """Train an agent by self-play."""
+
+    wandb.init(
+        project=wandb_project,
+        config={
+            "game_class": game_class,
+            "agent_class": agent_class,
+            "selfplay_batch_size": selfplay_batch_size,
+            "training_batch_size": training_batch_size,
+            "num_simulations_per_move": num_simulations_per_move,
+            "learning_rate": learning_rate,
+            "weight_decay": weight_decay,
+            "lr_decay_steps": lr_decay_steps,
+            "random_seed": random_seed,
+        }
+    )
+
     env = import_class(game_class)()
     agent = import_class(agent_class)(
         input_dims=env.observation().shape,
@@ -317,6 +335,22 @@ def train(
                 "iter": iteration,
             }
             pickle.dump(dic, writer)
+
+        wandb.log({
+            "iteration": iteration,
+            "value_loss": value_loss,
+            "policy_loss": policy_loss,
+            "total_loss": value_loss + policy_loss,
+            "learning_rate": optim[1][-1].learning_rate,
+            "wins": result_1.win_count + result_2.loss_count,
+            "draws": result_1.draw_count + result_2.draw_count,
+            "losses": result_1.loss_count + result_2.win_count,
+            "win_rate": (result_1.win_count + result_2.loss_count) / 
+                       (result_1.win_count + result_2.loss_count + result_1.draw_count + 
+                        result_2.draw_count + result_1.loss_count + result_2.win_count)
+        })
+
+    wandb.finish()
     print("Done!")
 
 

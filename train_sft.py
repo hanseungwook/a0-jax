@@ -183,10 +183,9 @@ def train(
         # Log metrics
         wandb.log({
             "epoch_loss": avg_loss,
-            "learning_rate": optim[1][-1].learning_rate,
         })
 
-        print(f"Epoch {epoch}: loss={avg_loss:.4f}, lr={optim[1][-1].learning_rate:.1e}")
+        print(f"Epoch {epoch}: loss={avg_loss:.4f}")
 
     wandb.finish()
     print("Done!")

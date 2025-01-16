@@ -15,7 +15,7 @@
 export TF_CPP_MIN_LOG_LEVEL=2
 
 # Run the training script
-python3 train_agent.py \
+python3 train_agent_rl.py \
     --game-class="games.go_game.GoBoard9x9" \
     --agent-class="policies.resnet_policy.ResnetPolicyValueNet128" \
     --selfplay-batch-size=1024 \

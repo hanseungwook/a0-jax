@@ -176,7 +176,7 @@ def collect_self_play_data(
     return data
 
 
-def loss_fn(net, net_ref, data: TrainingExample, reference_kl_weight: float = 1.0):
+def loss_fn(net, net_ref, data: TrainingExample, ref_kl_coef: float = 1.0):
     """Sum of value loss, policy loss, and reference policy KL loss."""
     net, (action_logits, value) = batched_policy(net, data.state)
     
@@ -190,21 +190,21 @@ def loss_fn(net, net_ref, data: TrainingExample, reference_kl_weight: float = 1.
     kl_loss = jnp.sum(target_pr * (jnp.log(target_pr) - action_logits), axis=-1)
     kl_loss = jnp.mean(kl_loss)
 
-    # Add KL divergence with reference policy
+    # Add KL divergence with reference policy - with stop_gradient
     _, (ref_logits, _) = batched_policy(net_ref, data.state)
-    ref_logits = jax.nn.log_softmax(ref_logits, axis=-1)
+    ref_logits = jax.lax.stop_gradient(jax.nn.log_softmax(ref_logits, axis=-1))
     ref_pr = jnp.exp(ref_logits)
     ref_kl_loss = jnp.sum(ref_pr * (ref_logits - action_logits), axis=-1)
-    ref_kl_loss = jnp.mean(ref_kl_loss) * reference_kl_weight
+    ref_kl_loss = jnp.mean(ref_kl_loss)
 
-    total_loss = mse_loss + kl_loss + ref_kl_loss
+    total_loss = mse_loss + kl_loss + ref_kl_coef * ref_kl_loss
     return total_loss, (net, (mse_loss, kl_loss, ref_kl_loss))
 
 
 @partial(jax.pmap, axis_name="i")
-def train_step(net, net_ref, optim, data: TrainingExample):
+def train_step(net, net_ref, optim, data: TrainingExample, kl_coef: float):
     """A training step."""
-    (_, (net, losses)), grads = jax.value_and_grad(loss_fn, has_aux=True)(net, net_ref, data)
+    (_, (net, losses)), grads = jax.value_and_grad(loss_fn, has_aux=True)(net, net_ref, data, kl_coef)
     grads = jax.lax.pmean(grads, axis_name="i")
     net, optim = opax.apply_gradients(net, optim, grads)
     return net, optim, losses
@@ -224,6 +224,7 @@ def train(
     weight_decay: float = 1e-4,
     lr_decay_steps: int = 100_000,
     wandb_project: str = "a0-jax",
+    kl_coef: float = 1.0,
 ):
     """Train an agent by self-play."""
     
@@ -241,6 +242,7 @@ def train(
             "learning_rate": learning_rate,
             "weight_decay": weight_decay,
             "lr_decay_steps": lr_decay_steps,
+            "kl_coef": kl_coef,
             "random_seed": random_seed,
         }
     )
@@ -265,7 +267,10 @@ def train(
         with open(ckpt_filename, "rb") as f:
             dic = pickle.load(f)
             agent = agent.load_state_dict(dic["agent"])
-            optim = optim.load_state_dict(dic["optim"])
+            try:
+                optim = optim.load_state_dict(dic["optim"])
+            except:
+                print("Failed to load optimizer state -- using new optimizer (if loading from SFT model)")
             start_iter = dic["iter"] + 1
     else:
         assert False, "Checkpoint file not found"
@@ -304,7 +309,7 @@ def train(
         for idx in tqdm(ids, desc="Train agent"):
             batch = data[idx : (idx + training_batch_size)]
             batch = jax.tree_util.tree_map(_stack_and_reshape, *batch)
-            agent, optim, loss = train_step(agent, ref_agent, optim, batch)
+            agent, optim, loss = train_step(agent, ref_agent, optim, batch, kl_coef)
             losses.append(loss)
 
         value_loss, policy_loss, kl_loss = zip(*losses)

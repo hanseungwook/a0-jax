@@ -251,9 +251,6 @@ def train(
         num_actions=env.num_actions(),
     )
 
-    # initial/reference policy
-    ref_agent = jax.tree_util.tree_map(jnp.copy, agent)
-
     def lr_schedule(step):
         e = jnp.floor(step * 1.0 / lr_decay_steps)
         return learning_rate * jnp.exp2(-e)
@@ -271,7 +268,11 @@ def train(
             optim = optim.load_state_dict(dic["optim"])
             start_iter = dic["iter"] + 1
     else:
-        start_iter = 0
+        assert False, "Checkpoint file not found"
+
+    # reference policy
+    ref_agent = jax.tree_util.tree_map(jnp.copy, agent)
+
     rng_key = jax.random.PRNGKey(random_seed)
     shuffler = random.Random(random_seed)
     devices = jax.local_devices()

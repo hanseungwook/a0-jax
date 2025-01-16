@@ -2,14 +2,14 @@
 #SBATCH --job-name=go_training    # Name of the job
 #SBATCH --output=logs/go_%j.out        # Output file (%j will be replaced by job ID)
 #SBATCH --error=logs/go_%j.err         # Error file
-#SBATCH --time=240:00:00          # Maximum runtime in HH:MM:SS
-#SBATCH --partition=ada6000-shared
-#SBATCH --qos=vision-shared
+#SBATCH --time=48:00:00          # Maximum runtime in HH:MM:SS
+#SBATCH --partition=vision-pulkitag-h100,vision-pulkitag-a100
+#SBATCH --qos=vision-pulkitag-main
 #SBATCH --nodes=1                # Number of nodes
 #SBATCH --ntasks-per-node=1      # Number of tasks per node
 #SBATCH --cpus-per-task=16        # Number of CPU cores per task
-#SBATCH --mem=128G                # Memory per node
-#SBATCH --gres=gpu:7             # Number of GPUs required
+#SBATCH --mem=256G                # Memory per node
+#SBATCH --gres=gpu:4             # Number of GPUs required
 
 # Set environment variable
 export TF_CPP_MIN_LOG_LEVEL=2

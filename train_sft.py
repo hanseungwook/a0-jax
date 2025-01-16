@@ -169,7 +169,7 @@ def train(
             losses.append(loss)
             wandb.log({"iteration_loss": loss, "step": step + epoch * steps_per_epoch})
             
-        avg_loss = jnp.mean(losses)
+        avg_loss = jnp.mean(jnp.array(losses))
         
         # Save checkpoint
         with open(ckpt_filename, "wb") as writer:

@@ -26,4 +26,5 @@ python3 train_agent.py \
     --random-seed=42 \
     --ckpt-filename="./sft_rl_checkpoints/sft_rl_agent.ckpt" \
     --num-iterations=200 \
-    --lr-decay-steps=1000000
+    --lr-decay-steps=1000000 \
+    --kl-coef=1.0

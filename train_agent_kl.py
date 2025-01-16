@@ -219,13 +219,16 @@ def train(
     num_simulations_per_move: int = 32,
     num_self_plays_per_iteration: int = 128 * 100,
     learning_rate: float = 0.01,
-    ckpt_filename: str = "./agent.ckpt",
+    ckpt_filename: str = "./sft_rl_checkpoints/agent.ckpt",
     random_seed: int = 42,
     weight_decay: float = 1e-4,
     lr_decay_steps: int = 100_000,
     wandb_project: str = "a0-jax",
 ):
     """Train an agent by self-play."""
+    
+    # Create checkpoints directory if it doesn't exist
+    os.makedirs(os.path.dirname(ckpt_filename), exist_ok=True)
 
     wandb.init(
         project=wandb_project,
@@ -303,9 +306,11 @@ def train(
             agent, optim, loss = train_step(agent, ref_agent, optim, batch)
             losses.append(loss)
 
-        value_loss, policy_loss = zip(*losses)
+        value_loss, policy_loss, kl_loss = zip(*losses)
         value_loss = np.mean(sum(jax.device_get(value_loss))) / len(value_loss)
         policy_loss = np.mean(sum(jax.device_get(policy_loss))) / len(policy_loss)
+        kl_loss = np.mean(sum(jax.device_get(kl_loss))) / len(kl_loss)
+        
         agent, optim = jax.tree_util.tree_map(lambda x: x[0], (agent, optim))
         # new agent is player 1
         result_1: PlayResults = agent_vs_agent_multiple_games(
@@ -333,6 +338,7 @@ def train(
         print(
             f"  value loss {value_loss:.3f}"
             f"  policy loss {policy_loss:.3f}"
+            f"  kl loss {kl_loss:.3f}"
             f"  learning rate {optim[1][-1].learning_rate:.1e}"
         )
         # save agent's weights to disk
@@ -343,12 +349,18 @@ def train(
                 "iter": iteration,
             }
             pickle.dump(dic, writer)
+            
+        # Save iteration-specific checkpoint
+        iter_ckpt_path = ckpt_filename.replace('.ckpt', f'{iteration}.ckpt')
+        with open(iter_ckpt_path, "wb") as writer:
+            pickle.dump(dic, writer)
 
         wandb.log({
             "iteration": iteration,
             "value_loss": value_loss,
             "policy_loss": policy_loss,
-            "total_loss": value_loss + policy_loss,
+            "kl_loss": kl_loss,
+            "total_loss": value_loss + policy_loss + kl_loss,
             "learning_rate": optim[1][-1].learning_rate,
             "wins": result_1.win_count + result_2.loss_count,
             "draws": result_1.draw_count + result_2.draw_count,

@@ -269,9 +269,10 @@ def train(
             agent = agent.load_state_dict(dic["agent"])
             try:
                 optim = optim.load_state_dict(dic["optim"])
+                start_iter = dic["iter"] + 1
             except:
                 print("Failed to load optimizer state -- using new optimizer (if loading from SFT model)")
-            start_iter = dic["iter"] + 1
+                start_iter = 0
     else:
         assert False, "Checkpoint file not found"
 

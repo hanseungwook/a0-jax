@@ -26,7 +26,9 @@ def parse_sgf_to_numpy(filename: str) -> np.ndarray:
     board = boards.Board(board_size)
     positions = []
     actions = []
-
+    seq_positions = []  # New list for sequence positions
+    recent_positions = [board_to_array(board)] * 8  # Keep track of recent positions (9 - 1 
+    
     for node in sgf_game.get_main_sequence():
         if node.get_move():
             move = node.get_move()
@@ -37,8 +39,15 @@ def parse_sgf_to_numpy(filename: str) -> np.ndarray:
         # Record the current board state in canonical form (invariant to color)
         turn = 1 if color == 'b' else -1
         raw_board = board_to_array(board)
-        positions.append(raw_board * turn)
-
+        current_position = raw_board * turn
+        positions.append(current_position)
+        
+        # Update recent positions and create sequence
+        recent_positions.append(current_position)
+        if len(recent_positions) > 9:
+            recent_positions.pop(0)
+        
+        seq_positions.append(np.stack(recent_positions, axis=0))
 
         # Convert (row,col) to a single integer or pass
         if row is None or col is None:
@@ -52,19 +61,19 @@ def parse_sgf_to_numpy(filename: str) -> np.ndarray:
         # Now play the move
         board.play(row, col, color)
 
-    if len(positions) == 0:
+    if len(actions) == 0:
         return None, None
 
-    positions = np.stack(positions, axis=0)  # shape: (num_plays, board_size, board_size)
-    actions = np.array(actions, dtype=np.int32)  # shape: (num_plays,)
+    actions = np.array(actions, dtype=np.int32)
+    seq_positions = np.stack(seq_positions, axis=0)  # shape: (num_plays, 8, board_size, board_size)
 
-    # assert that length of positions and actions are the same
-    assert len(positions) == len(actions)
-    return positions, actions
+    assert len(actions) == len(seq_positions)
+    return actions, seq_positions
+
 
 def parse_sgf_folder(sgf_folder: str):
-    all_positions = []
     all_actions = []
+    all_seq_positions = []  # New list for sequence positions
     
     # Recursively get all .sgf files
     sgf_files = []
@@ -75,20 +84,20 @@ def parse_sgf_folder(sgf_folder: str):
     
     # Wrap with tqdm for progress tracking
     for path in tqdm(sgf_files, desc="Parsing SGF files"):
-        positions, actions = parse_sgf_to_numpy(path)
-        if positions is not None and actions is not None:
-            all_positions.append(positions)
+        actions, seq_positions = parse_sgf_to_numpy(path)
+        if actions is not None and seq_positions is not None:
             all_actions.append(actions)
+            all_seq_positions.append(seq_positions)
     
-    positions = np.concatenate(all_positions)
     actions = np.concatenate(all_actions)
-    return positions, actions
+    seq_positions = np.concatenate(all_seq_positions)
+    return actions, seq_positions
 
 if __name__ == "__main__":
-    positions, actions = parse_sgf_folder("./data")
-    print(f"Total number of positions: {len(positions)}")
-    print(f"Positions shape: {positions.shape}")
+    actions, seq_positions = parse_sgf_folder("./data")
+    print(f"Total number of positions: {len(actions)}")
     print(f"Actions shape: {actions.shape}")
+    print(f"Sequence positions shape: {seq_positions.shape}")
     
     # Save positions and actions using numpy's savez
-    np.savez("go9x9_data.npz", positions=positions, actions=actions)
+    np.savez("go9x9_data.npz", actions=actions, seq_positions=seq_positions)

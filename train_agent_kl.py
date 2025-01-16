@@ -286,6 +286,10 @@ def train(
 
     def _stack_and_reshape(*xs):
         x = np.stack(xs)
+        # Calculate the largest multiple of num_devices that fits in the batch
+        valid_size = (len(x) // num_devices) * num_devices
+        # Truncate to valid size before reshaping
+        x = x[:valid_size]
         x = np.reshape(x, (num_devices, -1) + x.shape[1:])
         return x
 
@@ -305,11 +309,12 @@ def train(
         shuffler.shuffle(data)
         old_agent = jax.tree_util.tree_map(jnp.copy, agent)
         agent, losses = agent.train(), []
-        agent, optim = jax.device_put_replicated((agent, optim), devices)
+        agent, ref_agent, optim, kl_coef = jax.device_put_replicated((agent, ref_agent, optim, kl_coef), devices)
         ids = range(0, len(data) - training_batch_size, training_batch_size)
         for idx in tqdm(ids, desc="Train agent"):
             batch = data[idx : (idx + training_batch_size)]
             batch = jax.tree_util.tree_map(_stack_and_reshape, *batch)
+            
             agent, optim, loss = train_step(agent, ref_agent, optim, batch, kl_coef)
             losses.append(loss)
 

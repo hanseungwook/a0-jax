@@ -323,7 +323,7 @@ def train(
         policy_loss = np.mean(sum(jax.device_get(policy_loss))) / len(policy_loss)
         kl_loss = np.mean(sum(jax.device_get(kl_loss))) / len(kl_loss)
         
-        agent, ref_agent, optim = jax.tree_util.tree_map(lambda x: x[0], (agent, ref_agent, optim))
+        agent, ref_agent, optim, kl_coef = jax.tree_util.tree_map(lambda x: x[0], (agent, ref_agent, optim, kl_coef))
         # new agent is player 1
         result_1: PlayResults = agent_vs_agent_multiple_games(
             agent.eval(),

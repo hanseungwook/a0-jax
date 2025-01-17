@@ -191,8 +191,8 @@ def loss_fn(net, net_ref, data: TrainingExample, ref_kl_coef: float = 1.0):
     kl_loss = jnp.mean(kl_loss)
 
     # Add KL divergence with reference policy - with stop_gradient
-    _, (ref_logits, _) = batched_policy(net_ref, data.state)
-    ref_logits = jax.lax.stop_gradient(jax.nn.log_softmax(ref_logits, axis=-1))
+    net_ref, (ref_logits, _) = batched_policy(net_ref, data.state)
+    ref_logits = jax.nn.log_softmax(ref_logits, axis=-1)
     ref_pr = jnp.exp(ref_logits)
     ref_kl_loss = jnp.sum(ref_pr * (ref_logits - action_logits), axis=-1)
     ref_kl_loss = jnp.mean(ref_kl_loss)
@@ -308,7 +308,7 @@ def train(
         data = list(data)
         shuffler.shuffle(data)
         old_agent = jax.tree_util.tree_map(jnp.copy, agent)
-        agent, losses = agent.train(), []
+        agent, ref_agent, losses = agent.train(), ref_agent.eval(), []
         agent, ref_agent, optim, kl_coef = jax.device_put_replicated((agent, ref_agent, optim, kl_coef), devices)
         ids = range(0, len(data) - training_batch_size, training_batch_size)
         for idx in tqdm(ids, desc="Train agent"):
@@ -323,7 +323,7 @@ def train(
         policy_loss = np.mean(sum(jax.device_get(policy_loss))) / len(policy_loss)
         kl_loss = np.mean(sum(jax.device_get(kl_loss))) / len(kl_loss)
         
-        agent, optim = jax.tree_util.tree_map(lambda x: x[0], (agent, optim))
+        agent, ref_agent, optim = jax.tree_util.tree_map(lambda x: x[0], (agent, ref_agent, optim))
         # new agent is player 1
         result_1: PlayResults = agent_vs_agent_multiple_games(
             agent.eval(),

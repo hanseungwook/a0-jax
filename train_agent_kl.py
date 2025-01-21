@@ -206,14 +206,6 @@ def train_step(net, net_ref, optim, data: TrainingExample, kl_coef: float):
     """A training step."""
     (_, (net, losses)), grads = jax.value_and_grad(loss_fn, has_aux=True)(net, net_ref, data, kl_coef)
     
-    # DEBUGGING
-    # Log gradients for the value head
-    value_head_grads = grads.parameters["value_head"]  # Adjust this key to match your model structure
-    value_head_grads_flat = jax.tree_util.tree_flatten(value_head_grads)[0]
-    print("Value Head Gradients:", flush=True)
-    for grad in value_head_grads_flat:
-        print(jax.device_get(grad), flush=True)  # Transfer gradients to the host and print
-    
     grads = jax.lax.pmean(grads, axis_name="i")
     net, optim = opax.apply_gradients(net, optim, grads)
     return net, optim, losses

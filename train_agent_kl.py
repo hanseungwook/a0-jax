@@ -274,7 +274,8 @@ def train(
                 print("Failed to load optimizer state -- using new optimizer (if loading from SFT model)")
                 start_iter = 0
     else:
-        assert False, "Checkpoint file not found"
+        print("WARNING!!! Checkpoint file not found")
+        start_iter = 0
 
     # reference policy
     ref_agent = jax.tree_util.tree_map(jnp.copy, agent)

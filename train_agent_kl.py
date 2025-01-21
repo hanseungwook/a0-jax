@@ -205,6 +205,15 @@ def loss_fn(net, net_ref, data: TrainingExample, ref_kl_coef: float = 1.0):
 def train_step(net, net_ref, optim, data: TrainingExample, kl_coef: float):
     """A training step."""
     (_, (net, losses)), grads = jax.value_and_grad(loss_fn, has_aux=True)(net, net_ref, data, kl_coef)
+    
+    # DEBUGGING
+    # Log gradients for the value head
+    value_head_grads = grads.parameters["value_head"]  # Adjust this key to match your model structure
+    value_head_grads_flat = jax.tree_util.tree_flatten(value_head_grads)[0]
+    print("Value Head Gradients:", flush=True)
+    for grad in value_head_grads_flat:
+        print(jax.device_get(grad), flush=True)  # Transfer gradients to the host and print
+    
     grads = jax.lax.pmean(grads, axis_name="i")
     net, optim = opax.apply_gradients(net, optim, grads)
     return net, optim, losses
@@ -273,10 +282,10 @@ def train(
             except:
                 print("Failed to load optimizer state -- using new optimizer (if loading from SFT model)")
                 start_iter = 0
-            optim = opax.chain(
-                opax.add_decayed_weights(weight_decay),
-                opax.sgd(lr_schedule, momentum=0.9),
-            ).init(agent.parameters())
+                optim = opax.chain(
+                    opax.add_decayed_weights(weight_decay),
+                    opax.sgd(lr_schedule, momentum=0.9),
+                ).init(agent.parameters())
     else:
         print("WARNING!!! Checkpoint file not found")
         start_iter = 0

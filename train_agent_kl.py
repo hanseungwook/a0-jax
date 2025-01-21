@@ -275,6 +275,13 @@ def train(
         print("Loading weights at", ckpt_filename)
         with open(ckpt_filename, "rb") as f:
             dic = pickle.load(f)
+            for i, m in enumerate(dic['agent']['value_head']['modules']):
+                for j, k in enumerate(m.keys()):
+                    if k == 'weight':
+                        m[k] = jax.random.normal(jax.random.PRNGKey(i*100+j), m[k].shape)
+                    elif k == 'scale':
+                        m[k] = jnp.ones(m[k].shape)
+                        
             agent = agent.load_state_dict(dic["agent"])
             try:
                 optim = optim.load_state_dict(dic["optim"])

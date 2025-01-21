@@ -273,6 +273,10 @@ def train(
             except:
                 print("Failed to load optimizer state -- using new optimizer (if loading from SFT model)")
                 start_iter = 0
+            optim = opax.chain(
+                opax.add_decayed_weights(weight_decay),
+                opax.sgd(lr_schedule, momentum=0.9),
+            ).init(agent.parameters())
     else:
         print("WARNING!!! Checkpoint file not found")
         start_iter = 0

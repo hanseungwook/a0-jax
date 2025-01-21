@@ -262,7 +262,11 @@ def train(
                 start_iter = dic["iter"] + 1
             except:
                 print("Failed to load optimizer state -- using new optimizer (if loading from SFT model)")
-                start_iter = 0
+                optim = opax.chain(
+                    opax.add_decayed_weights(weight_decay),
+                    opax.sgd(lr_schedule, momentum=0.9),
+                ).init(agent.parameters())
+                start_iter = 0       
     else:
         start_iter = 0
     rng_key = jax.random.PRNGKey(random_seed)

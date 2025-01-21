@@ -257,8 +257,12 @@ def train(
         with open(ckpt_filename, "rb") as f:
             dic = pickle.load(f)
             agent = agent.load_state_dict(dic["agent"])
-            optim = optim.load_state_dict(dic["optim"])
-            start_iter = dic["iter"] + 1
+            try:
+                optim = optim.load_state_dict(dic["optim"])
+                start_iter = dic["iter"] + 1
+            except:
+                print("Failed to load optimizer state -- using new optimizer (if loading from SFT model)")
+                start_iter = 0
     else:
         start_iter = 0
     rng_key = jax.random.PRNGKey(random_seed)
